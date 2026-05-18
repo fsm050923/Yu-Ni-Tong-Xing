@@ -1,0 +1,41 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
+    "ANTHROPIC_AUTH_TOKEN": "sk-f00ae7fc75504e1aaec60109d1fa0bc5",
+    "ANTHROPIC_MODEL": "deepseek-v4-pro",
+    "ANTHROPIC_SMALL_FAST_MODEL": "deepseek-v4-flash",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-v4-pro",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-v4-pro",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-v4-flash",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "deepseek-v4-pro",
+    "CLAUDE_CODE_EFFORT_LEVEL": "max"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm run test)",
+      "Bash(npm run build)",
+      "Bash(git status)",
+      "Bash(git diff)",
+      "Bash(python fill_ppt.py)",
+      "Bash(pip install *)",
+      "Bash(python -c \"from pptx import Presentation; prs = Presentation\\(r'C:\\\\Users\\\\36664\\\\OneDrive\\\\桌面\\\\AIGC\\\\应用赛道初赛作品策划模板.pptx'\\); print\\('OK, slides:', len\\(prs.slides\\)\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(attrib \"C:\\\\Users\\\\36664\\\\OneDrive\\\\桌面\\\\AIGC\\\\应用赛道初赛作品策划模板.pptx\")",
+      "Bash(where 7z)",
+      "Bash(powershell *)",
+      "Bash(pip uninstall *)",
+      "Bash(python build_ppt.py)",
+      "Bash(python *)",
+      "Bash(tesseract --version)",
+      "Bash(npm create *)",
+      "Bash(npm install *)",
+      "Bash(npx vite *)",
+      "Bash(npx ngrok *)",
+      "Bash(npx localtunnel *)",
+      "Bash(curl *)",
+      "Bash(npx *)",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -R 0:localhost:5173 -p 443 connect@a.pinggy.io)",
+      "Bash(netsh advfirewall *)"
+    ]
+  }
+}

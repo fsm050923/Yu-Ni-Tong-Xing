@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">与你童行</string>
+    <string name="title_activity_main">与你童行</string>
+    <string name="package_name">com.yunitongxing.app</string>
+    <string name="custom_url_scheme">com.yunitongxing.app</string>
+</resources>
