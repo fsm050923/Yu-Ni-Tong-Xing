@@ -1,0 +1,26 @@
+# IDE
+.idea/
+
+# SSH keys (security)
+.ssh/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Screenshots / temp images
+emulator_screen.png
+*.png.tmp
+
+# Unrelated loose files
+script.js
+style.css
+
+# Course materials (not project source)
+2026年度课程设计说明.pptx
+
+# Office temp files
+~$*
+
+# Dependencies
+node_modules/
