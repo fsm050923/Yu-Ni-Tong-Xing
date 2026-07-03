@@ -116,7 +116,7 @@ function poiToTripNode(poi: POIEntry, idx: number, segment: 'morning' | 'afterno
     startTime: `${String(startH).padStart(2, '0')}:${String(Math.floor(Math.random() * 30)).padStart(2, '0')}`,
     endTime: `${String(endH).padStart(2, '0')}:${String(Math.floor(Math.random() * 30)).padStart(2, '0')}`,
     duration,
-    walkingFromPrev: idx > 0 ? { distance: Math.round(200 + Math.random() * 800), estimatedMinutes: Math.round(3 + Math.random() * 12) } : undefined,
+    walkingFromPrev: idx > 0 ? { distance: Math.round(200 + Math.random() * 800), duration: Math.round(3 + Math.random() * 12), childFriendly: true } : null,
     childFriendlinessRating: poi.rating,
     crowdLevel: poi.crowd,
     tips: poi.tips,
@@ -131,14 +131,47 @@ function poiToTripNode(poi: POIEntry, idx: number, segment: 'morning' | 'afterno
   }
 }
 
+/** Build generic kid-friendly POIs for any city not in the static database */
+function buildGenericPOIs(city: string): POIEntry[] {
+  const templates: Array<{ suffix: string; poiType: string; indoor: boolean; keywords: string[]; tips: string[]; ticket?: { adult: number; child: number } }> = [
+    { suffix: '儿童公园', poiType: 'playground', indoor: false, keywords: ['公园', '户外', '免费', '游乐'], tips: ['有儿童游乐区', '免费'], ticket: { adult: 0, child: 0 } },
+    { suffix: '自然博物馆', poiType: 'museum', indoor: true, keywords: ['博物馆', '自然', '室内', '安静'], tips: ['适合亲子参观', '免费或低价'], ticket: { adult: 0, child: 0 } },
+    { suffix: '中心广场', poiType: 'park', indoor: false, keywords: ['广场', '户外', '散步', '免费'], tips: ['空间开阔', '适合放风筝'], ticket: { adult: 0, child: 0 } },
+    { suffix: '海洋世界', poiType: 'museum', indoor: true, keywords: ['海洋', '动物', '室内', '表演'], tips: ['有海洋动物表演'], ticket: { adult: 150, child: 75 } },
+    { suffix: '动物园', poiType: 'playground', indoor: false, keywords: ['动物', '户外', '自然'], tips: ['能看到各种动物'], ticket: { adult: 80, child: 40 } },
+    { suffix: '科技馆', poiType: 'science-center', indoor: true, keywords: ['科技', '室内', '互动', '科学'], tips: ['互动项目多'], ticket: { adult: 40, child: 0 } },
+    { suffix: '亲子餐厅', poiType: 'restaurant', indoor: true, keywords: ['餐厅', '儿童', '室内', '吃饭'], tips: ['有儿童餐'], ticket: { adult: 60, child: 30 } },
+    { suffix: '湿地公园', poiType: 'park', indoor: false, keywords: ['公园', '自然', '户外', '散步'], tips: ['环境好', '适合散步'], ticket: { adult: 0, child: 0 } },
+  ]
+  return templates.map((t, i) => ({
+    name: `${city}${t.suffix}`,
+    poiType: t.poiType,
+    lat: 30 + Math.random() * 10,
+    lng: 110 + Math.random() * 15,
+    rating: (3 + Math.floor(Math.random() * 3)) as 1|2|3|4|5,
+    crowd: (1 + Math.floor(Math.random() * 3)) as 1|2|3|4,
+    indoor: t.indoor,
+    keywords: t.keywords,
+    tips: t.tips,
+    ticket: t.ticket,
+  }))
+}
+
 export function generateMockTrip(userInput: string, ageGroupStr: string): Trip {
-  // Detect city
-  let city = '大连' // default
+  // Detect city from input — try DB first, then regex extraction, finally use as-is
+  let city = ''
   for (const c of Object.keys(ALL_POIS)) {
     if (userInput.includes(c)) { city = c; break }
   }
+  if (!city) {
+    const cityMatch = userInput.match(/[去在到](\S{2,4})(?:玩|旅游|出行|逛逛|转转)/)
+    city = cityMatch ? cityMatch[1] : (userInput.split(/[\s,，]/)[0] || '目的地')
+  }
 
-  const poiPool = ALL_POIS[city as keyof typeof ALL_POIS] || DALIAN_POIS
+  let poiPool = ALL_POIS[city as keyof typeof ALL_POIS]
+  if (!poiPool || poiPool.length < 3) {
+    poiPool = buildGenericPOIs(city)
+  }
   const { keywords, preferIndoor } = extractKeywords(userInput)
   const ageGroup = ageGroupStr as 'infant' | 'preschool' | 'school'
   const childAge = ageGroup === 'infant' ? 2 : ageGroup === 'preschool' ? 5 : 8
@@ -147,23 +180,29 @@ export function generateMockTrip(userInput: string, ageGroupStr: string): Trip {
   const scored = shuffle(poiPool).map((p) => ({ poi: p, score: scorePOI(p, keywords, preferIndoor) }))
   scored.sort((a, b) => b.score - a.score)
 
-  // Build itinerary: pick top-scored POIs, ensure variety
+  // Build itinerary: pick top-scored POIs, ensure variety, no duplicates
   const selected: POIEntry[] = []
   const usedTypes = new Set<string>()
+  const usedNames = new Set<string>()
 
   // First pass: pick best matching of each type
   for (const { poi } of scored) {
     if (selected.length >= 5) break
+    if (usedNames.has(poi.name)) continue
     if (!usedTypes.has(poi.poiType) || selected.length < 3) {
       selected.push(poi)
       usedTypes.add(poi.poiType)
+      usedNames.add(poi.name)
     }
   }
 
-  // If not enough, fill with remaining
+  // If not enough, fill with remaining (skip duplicates)
   for (const { poi } of scored) {
     if (selected.length >= 5) break
-    if (!selected.includes(poi)) selected.push(poi)
+    if (!selected.includes(poi) && !usedNames.has(poi.name)) {
+      selected.push(poi)
+      usedNames.add(poi.name)
+    }
   }
 
   // Ensure at least one restaurant for afternoon

@@ -1,5 +1,6 @@
 import type { Trip } from '../types/trip'
 import { useMemoryStore } from '../stores/useMemoryStore'
+import { useTripStore } from '../stores/useTripStore'
 
 const DB_NAME = 'ytx_memory_db'
 const DB_VERSION = 1
@@ -29,7 +30,7 @@ export class LongTermMemory {
 
   async saveTrip(trip: Trip): Promise<void> {
     // Also save to Zustand (localStorage fallback)
-    this.store.saveTripToHistory?.(trip)
+    useTripStore.getState().saveTripToHistory()
 
     if (!this.db) await this.init()
     if (!this.db) return

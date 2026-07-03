@@ -17,6 +17,7 @@ export interface WalkingInfo {
   distance: number;        // meters
   duration: number;        // minutes
   childFriendly: boolean;
+  polyline?: string;       // Amap walking route polyline "lng,lat;lng,lat;..."
 }
 
 export interface TripNode {
@@ -38,6 +39,11 @@ export interface TripNode {
   crowdLevel: 1 | 2 | 3 | 4;
   tips: string[];
   indoor: boolean;
+  photos?: string[];
+  description?: string;
+  amapId?: string;
+  tel?: string;
+  rating?: number;
 }
 
 export interface DaySegments {

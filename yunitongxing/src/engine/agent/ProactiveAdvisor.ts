@@ -20,16 +20,23 @@ export class ProactiveAdvisor {
    */
   check(): ProactiveCheck | null {
     const now = Date.now()
-    if (now - this.lastCheckTime < this.checkInterval) return null
+    const agentStore = useAgentStore.getState()
+    const effectiveInterval = agentStore.isCompanionMode ? 30000 : this.checkInterval
+    if (now - this.lastCheckTime < effectiveInterval) return null
     this.lastCheckTime = now
 
     const tripStore = useTripStore.getState()
-    const agentStore = useAgentStore.getState()
     const trip = tripStore.currentTrip
 
     if (!trip) return null
 
     const checks: ProactiveCheck[] = []
+
+    // 0. Companion mode: time-schedule-based checks
+    if (agentStore.isCompanionMode) {
+      const scheduleCheck = this.checkTripSchedule(trip)
+      if (scheduleCheck) checks.push(scheduleCheck)
+    }
 
     // 1. Rest reminder based on elapsed time
     const restCheck = this.checkRestNeeded(trip.childAge)
@@ -143,9 +150,10 @@ export class ProactiveAdvisor {
 
   private checkCrowdPeak(): ProactiveCheck | null {
     const hour = new Date().getHours()
+    const min = new Date().getMinutes()
 
-    // Lunch peak: 11:30-12:30
-    if (hour === 11) {
+    // Lunch peak: 11:00-12:30
+    if ((hour === 11 && min >= 0) || (hour === 12 && min <= 30)) {
       return {
         shouldNotify: true,
         message: '快到午餐高峰时间了！要不要提前找好亲子餐厅，避开排队？🍽️',
@@ -155,6 +163,103 @@ export class ProactiveAdvisor {
     }
 
     return null
+  }
+
+  private checkTripSchedule(trip: ReturnType<typeof useTripStore.getState>['currentTrip']): ProactiveCheck | null {
+    if (!trip) return null
+
+    const now = new Date()
+    const currentHour = now.getHours()
+    const currentMin = now.getMinutes()
+    const currentTimeStr = `${String(currentHour).padStart(2, '0')}:${String(currentMin).padStart(2, '0')}`
+
+    // Collect all nodes across all days
+    const allNodes = trip.days.flatMap((d) =>
+      [...d.segments.morning, ...d.segments.afternoon, ...d.segments.evening]
+    )
+
+    if (allNodes.length === 0) return null
+
+    const firstNode = allNodes[0]
+    const lastNode = allNodes[allNodes.length - 1]
+
+    // 30min before first stop → departure reminder
+    const firstTime = firstNode.startTime
+    if (this.isTimeNear(currentTimeStr, firstTime, -30)) {
+      return {
+        shouldNotify: true,
+        message: `准备好出发了吗？第一站「${firstNode.name}」在等你～记得带好水壶和小零食哦 🎒`,
+        type: 'time',
+        priority: 'high',
+      }
+    }
+
+    // At start time → go!
+    if (this.isTimeNear(currentTimeStr, firstTime, 0)) {
+      return {
+        shouldNotify: true,
+        message: `出发时间到！第一站「${firstNode.name}」${firstNode.indoor ? '室内游玩不怕天气' : '户外记得防晒'} 🌟`,
+        type: 'time',
+        priority: 'high',
+      }
+    }
+
+    // Lunch time detection (11:30-12:30)
+    if (currentHour === 11 && currentMin >= 30 || currentHour === 12 && currentMin <= 30) {
+      const lunchNode = allNodes.find((n) => n.type === 'restaurant')
+      if (lunchNode) {
+        return {
+          shouldNotify: true,
+          message: `午餐时间到！附近推荐「${lunchNode.name}」，带宝贝补充能量吧 🍽️`,
+          type: 'time',
+          priority: 'high',
+        }
+      }
+    }
+
+    // Afternoon rest check (2:30-3:30pm)
+    if (currentHour >= 14 && currentHour <= 15 && currentMin >= 30) {
+      return {
+        shouldNotify: true,
+        message: `下午茶时间～找个地方坐坐，孩子也需要休息一会儿 🧃`,
+        type: 'rest',
+        priority: 'medium',
+      }
+    }
+
+    // Near end of last stop → wrap up
+    const lastEndTime = lastNode.endTime || '17:00'
+    if (this.isTimeNear(currentTimeStr, lastEndTime, -30)) {
+      return {
+        shouldNotify: true,
+        message: `最后一站「${lastNode.name}」快结束啦～今天玩得开心吗？记得记录今天的回忆哦 📸`,
+        type: 'time',
+        priority: 'medium',
+      }
+    }
+
+    // Post-trip: 30min after last stop
+    if (this.isTimeNear(currentTimeStr, lastEndTime, 30)) {
+      return {
+        shouldNotify: true,
+        message: `今天的行程结束啦！要不要保存到成长足迹，记录宝贝的每一次出行？🌟`,
+        type: 'time',
+        priority: 'low',
+      }
+    }
+
+    return null
+  }
+
+  private isTimeNear(current: string, target: string, offsetMinutes: number): boolean {
+    const [cH, cM] = current.split(':').map(Number)
+    const [tH, tM] = target.split(':').map(Number)
+    if (isNaN(cH) || isNaN(tH)) return false
+
+    const currentTotal = cH * 60 + cM
+    const targetTotal = tH * 60 + tM + offsetMinutes
+
+    return Math.abs(currentTotal - targetTotal) <= 5
   }
 }
 

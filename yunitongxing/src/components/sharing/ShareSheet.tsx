@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import html2canvas from 'html2canvas'
 import { useUIStore } from '../../stores/useUIStore'
 import { useTripStore } from '../../stores/useTripStore'
 
@@ -6,13 +8,36 @@ export default function ShareSheet() {
   const toggleSheet = useUIStore((s) => s.toggleShareSheet)
   const currentTrip = useTripStore((s) => s.currentTrip)
   const showToast = useUIStore((s) => s.showToast)
+  const [isCapturing, setIsCapturing] = useState(false)
 
   if (!isOpen) return null
 
   const handleSaveImage = async () => {
+    const mapEl = document.getElementById('child-map-container')
+    if (!mapEl) {
+      showToast('请先在地图页面生成行程', 'info')
+      return
+    }
+
+    setIsCapturing(true)
     showToast('正在生成高清地图图片...', 'info')
-    // In production: html2canvas capture the map element
-    setTimeout(() => showToast('图片已保存到相册', 'success'), 1500)
+
+    try {
+      const canvas = await html2canvas(mapEl, {
+        useCORS: true,
+        backgroundColor: '#E8F4E8',
+        scale: 2,
+      })
+      const link = document.createElement('a')
+      link.download = `与你童行_${currentTrip?.title || '行程地图'}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+      showToast('地图图片已保存', 'success')
+    } catch {
+      showToast('截图失败，请重试', 'error')
+    } finally {
+      setIsCapturing(false)
+    }
   }
 
   const handleExportDoc = () => {
@@ -37,10 +62,31 @@ ${d.segments.evening.length > 0 ? `🌙 晚上：${d.segments.evening.map(n => n
     showToast('行程文档已下载', 'success')
   }
 
+  const handleShare = async () => {
+    if (!currentTrip) return
+    const text = `与你童行 · ${currentTrip.title}\n目的地：${currentTrip.destination}\n${currentTrip.days.length}天亲子游`
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: currentTrip.title, text, url: window.location.href })
+      } catch {
+        // user cancelled, ignore
+      }
+    } else {
+      navigator.clipboard?.writeText(text)
+      showToast('行程信息已复制，请粘贴分享', 'success')
+    }
+  }
+
+  const handleOpenMemoir = () => {
+    toggleSheet()
+    window.dispatchEvent(new Event('open-memoir-card'))
+  }
+
   const shareOptions = [
-    { label: '保存地图图片', emoji: '📸', action: handleSaveImage },
+    { label: isCapturing ? '生成中...' : '保存地图图片', emoji: isCapturing ? '⏳' : '📸', action: handleSaveImage },
+    { label: '生成纪念卡片', emoji: '🎨', action: handleOpenMemoir },
     { label: '导出行程文档', emoji: '📄', action: handleExportDoc },
-    { label: '分享给微信好友', emoji: '💬', action: () => showToast('请使用系统分享功能', 'info') },
+    { label: '分享行程给朋友', emoji: '💬', action: handleShare },
     { label: '复制行程链接', emoji: '🔗', action: () => { navigator.clipboard?.writeText(window.location.href); showToast('链接已复制', 'success') } },
   ]
 
@@ -53,7 +99,7 @@ ${d.segments.evening.length > 0 ? `🌙 晚上：${d.segments.evening.map(n => n
         </div>
         <div className="px-5 py-4">
           <h3 className="text-sm font-bold text-text-primary mb-3">分享与导出</h3>
-          <div className="grid grid-cols-2 gap-2 mb-4">
+          <div className="grid grid-cols-3 gap-2 mb-4">
             {shareOptions.map((opt) => (
               <button
                 key={opt.label}

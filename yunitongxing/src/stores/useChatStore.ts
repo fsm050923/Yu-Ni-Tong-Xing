@@ -5,9 +5,10 @@ export interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
-  type: 'text' | 'itinerary_card' | 'map_update' | 'tool_call' | 'voice'
+  type: 'text' | 'itinerary_card' | 'map_update' | 'tool_call' | 'voice' | 'trip_card'
   timestamp: number
   toolCalls?: Array<{ name: string; args: Record<string, unknown>; result?: string }>
+  tripData?: import('../types/trip').Trip
 }
 
 interface ChatState {

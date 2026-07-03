@@ -8,6 +8,7 @@ interface AgentState {
   activeToolCalls: ToolCallStatus[]
   proactiveSuggestion: string | null
   isAutonomousMode: boolean
+  isCompanionMode: boolean
 
   setPhase: (phase: AgentPhase) => void
   addToolCall: (name: string) => string
@@ -15,6 +16,7 @@ interface AgentState {
   clearToolCalls: () => void
   setProactiveSuggestion: (text: string | null) => void
   toggleAutonomousMode: () => void
+  toggleCompanionMode: () => void
 }
 
 export const useAgentStore = create<AgentState>((set, get) => ({
@@ -22,8 +24,10 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   activeToolCalls: [],
   proactiveSuggestion: null,
   isAutonomousMode: false,
+  isCompanionMode: false,
 
   setPhase: (phase) => set({ phase }),
+  toggleCompanionMode: () => set((s) => ({ isCompanionMode: !s.isCompanionMode })),
   addToolCall: (name) => {
     const idx = get().activeToolCalls.length
     set((s) => ({ activeToolCalls: [...s.activeToolCalls, { name, status: 'pending' }] }))

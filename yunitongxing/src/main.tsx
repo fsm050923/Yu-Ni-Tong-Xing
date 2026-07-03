@@ -4,8 +4,12 @@ import { HashRouter } from 'react-router-dom'
 import App from './App'
 import './styles/index.css'
 import { registerAllTools } from './engine/tools'
+import { useTripStore } from './stores/useTripStore'
+import { useMemoryStore } from './stores/useMemoryStore'
 
 registerAllTools()
+useTripStore.getState().loadFromStorage()
+useMemoryStore.getState().loadFromStorage()
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

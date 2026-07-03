@@ -244,19 +244,15 @@ function decideToolCalls(input: string): LLMResponse {
 
   const today = new Date().toISOString().slice(0, 10)
 
+  const hasTravelIntent = input.includes('去') || input.includes('玩') || input.includes('出行') ||
+    input.includes('规划') || input.includes('行程') || input.includes('旅游') || input.includes('带')
+
   // Trip planning intent
-  if (
-    input.includes('去') ||
-    input.includes('玩') ||
-    input.includes('出行') ||
-    input.includes('规划') ||
-    input.includes('行程') ||
-    input.includes('旅游') ||
-    input.includes('带')
-  ) {
-    toolCalls.push(
-      makeCall('getWeather', { location: destination, date: today })
-    )
+  if (hasTravelIntent) {
+    const alreadyHasWeather = toolCalls.some((tc) => tc.function.name === 'getWeather' && tc.function.arguments.includes(destination))
+    if (!alreadyHasWeather) {
+      toolCalls.push(makeCall('getWeather', { location: destination, date: today }))
+    }
     toolCalls.push(
       makeCall('searchPoi', {
         location: destination,
@@ -273,8 +269,8 @@ function decideToolCalls(input: string): LLMResponse {
     )
   }
 
-  // Indoor / weather concern
-  if (input.includes('室内') || input.includes('下雨') || input.includes('天气')) {
+  // Indoor / weather concern — only if NOT already handled by travel intent
+  if (!hasTravelIntent && (input.includes('室内') || input.includes('下雨') || input.includes('天气'))) {
     toolCalls.push(
       makeCall('getWeather', { location: destination, date: today })
     )

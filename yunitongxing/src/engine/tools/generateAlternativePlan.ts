@@ -1,5 +1,6 @@
 import { useTripStore } from '../../stores/useTripStore'
 import { v4Id } from '../../utils/id'
+import { searchPoi, isAmapConfigured } from '../../services/amap'
 import type { TripNode } from '../../types/trip'
 
 export interface GenerateAlternativePlanArgs {
@@ -7,19 +8,8 @@ export interface GenerateAlternativePlanArgs {
   childAge: number
 }
 
-const INDOOR_ALTERNATIVES: Record<string, Array<Partial<TripNode>>> = {
-  '大连': [
-    { name: '大连圣亚海洋世界', poiType: 'museum', lat: 38.887, lng: 121.586, duration: 120, childFriendlinessRating: 5, crowdLevel: 3, indoor: true },
-    { name: '大连自然博物馆', poiType: 'museum', lat: 38.868, lng: 121.592, duration: 90, childFriendlinessRating: 4, crowdLevel: 1, indoor: true },
-    { name: '恒隆广场儿童乐园', poiType: 'indoor-play', lat: 38.897, lng: 121.59, duration: 120, childFriendlinessRating: 4, crowdLevel: 2, indoor: true },
-    { name: '亲子烘焙体验馆', poiType: 'restaurant', lat: 38.893, lng: 121.588, duration: 90, childFriendlinessRating: 5, crowdLevel: 1, indoor: true },
-  ],
-  '北京': [
-    { name: '中国科技馆', poiType: 'science-center', lat: 39.999, lng: 116.393, duration: 120, childFriendlinessRating: 5, crowdLevel: 2, indoor: true },
-    { name: '自然博物馆', poiType: 'museum', lat: 39.882, lng: 116.393, duration: 90, childFriendlinessRating: 4, crowdLevel: 2, indoor: true },
-    { name: '蓝港儿童乐园', poiType: 'indoor-play', lat: 39.953, lng: 116.474, duration: 120, childFriendlinessRating: 5, crowdLevel: 3, indoor: true },
-    { name: '水立方嬉水乐园', poiType: 'indoor-play', lat: 39.991, lng: 116.386, duration: 120, childFriendlinessRating: 5, crowdLevel: 3, indoor: true },
-  ],
+const WEATHER_LABELS: Record<string, string> = {
+  rainy: '雨天', hot: '高温天', cold: '寒冷', storm: '暴风雨',
 }
 
 export async function generateAlternativePlan(args: GenerateAlternativePlanArgs) {
@@ -30,51 +20,84 @@ export async function generateAlternativePlan(args: GenerateAlternativePlanArgs)
     return { success: false, error: '没有当前行程，先生成一个行程吧' }
   }
 
-  const cityAlts = Object.keys(INDOOR_ALTERNATIVES).find((c) => trip.destination.includes(c))
-    ? INDOOR_ALTERNATIVES[trip.destination]
-    : INDOOR_ALTERNATIVES['大连']
+  const label = WEATHER_LABELS[args.weatherCondition] || '室内'
 
-  const ageGroup = args.childAge <= 3 ? 'infant' : args.childAge <= 6 ? 'preschool' : 'school'
-
-  // Create indoor-only day
-  const indoorNodes = cityAlts.map((alt, i) => {
-    const startH = 9 + i * 2
+  if (!isAmapConfigured()) {
     return {
-      id: v4Id(),
-      type: 'attraction' as TripNode['type'],
-      poiType: alt.poiType!,
-      name: alt.name!,
-      address: '',
-      lat: alt.lat!,
-      lng: alt.lng!,
-      startTime: `${String(startH).padStart(2, '0')}:00`,
-      endTime: `${String(startH + 1.5).padStart(2, '0')}:30`,
-      duration: ageGroup === 'infant' ? 60 : alt.duration!,
-      dayIndex: 0,
-      segment: 'morning' as const,
-      walkingFromPrev: null,
-      ticketInfo: null,
-      childFriendlinessRating: alt.childFriendlinessRating!,
-      crowdLevel: alt.crowdLevel!,
-      tips: [],
-      indoor: true,
-    } as TripNode
-  })
+      success: false,
+      error: '需要配置高德API Key才能搜索室内备选方案',
+    }
+  }
 
-  // Switch to rainy plan in current trip
-  tripStore.switchWeatherPlan('rainy')
+  try {
+    const result = await searchPoi({
+      keywords: '室内 博物馆 科技馆 儿童乐园 亲子餐厅',
+      city: trip.destination,
+      offset: 10,
+    })
 
-  return {
-    success: true,
-    weatherCondition: args.weatherCondition,
-    alternativeNodes: indoorNodes.map((n) => ({
-      name: n.name,
-      poiType: n.poiType,
-      lat: n.lat,
-      lng: n.lng,
-      duration: n.duration,
-      rating: n.childFriendlinessRating,
-    })),
-    message: `已为您生成${args.weatherCondition === 'rainy' ? '雨天' : args.weatherCondition === 'hot' ? '高温天' : '室内'}备选方案，共${indoorNodes.length}个室内景点`,
+    if (result.pois.length === 0) {
+      return { success: false, error: `未找到${trip.destination}的室内备选场所` }
+    }
+
+    const ageGroup = args.childAge <= 3 ? 'infant' : args.childAge <= 6 ? 'preschool' : 'school'
+
+    const indoorNodes = result.pois.slice(0, 6).map((poi, i) => {
+      if (!poi.location) return null
+      const [lng, lat] = poi.location.split(',').map(Number)
+      if (!lat || !lng) return null
+
+      const startH = 9 + i * 2
+      const rating = poi.biz_ext?.rating ? parseFloat(poi.biz_ext.rating) : 4
+
+      return {
+        id: v4Id(),
+        type: 'attraction' as TripNode['type'],
+        poiType: (poi.typecode?.startsWith('14') ? 'museum'
+          : poi.typecode?.startsWith('1101') ? 'park'
+          : 'indoor-play') as TripNode['poiType'],
+        name: poi.name,
+        address: poi.address || '',
+        lat,
+        lng,
+        startTime: `${String(startH).padStart(2, '0')}:00`,
+        endTime: `${String(startH + 1).padStart(2, '0')}:30`,
+        duration: ageGroup === 'infant' ? 60 : 90,
+        dayIndex: 0,
+        segment: 'morning' as const,
+        walkingFromPrev: null,
+        ticketInfo: null,
+        childFriendlinessRating: Math.max(1, Math.min(5, Math.round(rating))) as TripNode['childFriendlinessRating'],
+        crowdLevel: 2 as TripNode['crowdLevel'],
+        tips: [],
+        indoor: true,
+        photos: (poi.photos || []).slice(0, 5).map((p: { url: string }) => p.url),
+        amapId: poi.id,
+      } as TripNode
+    }).filter(Boolean) as TripNode[]
+
+    if (indoorNodes.length === 0) {
+      return { success: false, error: '未找到有效的室内备选场所' }
+    }
+
+    tripStore.switchWeatherPlan('rainy')
+
+    return {
+      success: true,
+      weatherCondition: args.weatherCondition,
+      alternativeNodes: indoorNodes.map((n) => ({
+        name: n.name,
+        poiType: n.poiType,
+        lat: n.lat,
+        lng: n.lng,
+        duration: n.duration,
+        rating: n.childFriendlinessRating,
+      })),
+      source: 'amap_live',
+      message: `已为您生成${label}备选方案，共${indoorNodes.length}个室内景点`,
+    }
+  } catch (err) {
+    console.warn('[generateAlternativePlan] Amap search failed:', err)
+    return { success: false, error: '搜索室内备选方案失败，请稍后重试' }
   }
 }

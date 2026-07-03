@@ -1,5 +1,6 @@
 import { useTripStore } from '../../stores/useTripStore'
 import { useUIStore } from '../../stores/useUIStore'
+import WeatherBadge from '../weather/WeatherBadge'
 
 interface HeaderProps {
   title?: string
@@ -11,27 +12,30 @@ export default function Header({ title = '与你童行', leftAction }: HeaderPro
   const toggleShareSheet = useUIStore((s) => s.toggleShareSheet)
 
   return (
-    <header className="safe-area-top glass flex items-center justify-between px-4 py-2.5 z-50">
-      <div className="w-10 flex justify-start">{leftAction}</div>
-      <div className="flex items-center gap-2">
-        <span className="text-2xl">🧸</span>
-        <h1
-          className="text-lg font-bold gradient-text"
-          style={{ fontFamily: 'var(--font-display)' }}
-        >
-          {title}
-        </h1>
-      </div>
-      <div className="w-10 flex justify-end">
-        {currentTrip && (
-          <button
-            onClick={toggleShareSheet}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-warm-yellow/10 text-warm-yellow hover:bg-warm-yellow/20 transition-colors"
+    <header className="safe-area-top glass z-50">
+      <div className="flex items-center justify-between px-4 py-2.5">
+        <div className="w-10 flex justify-start">{leftAction}</div>
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">🧸</span>
+          <h1
+            className="text-lg font-bold gradient-text"
+            style={{ fontFamily: 'var(--font-display)' }}
           >
-            <span className="text-sm">📤</span>
-          </button>
-        )}
+            {title}
+          </h1>
+        </div>
+        <div className="w-10 flex justify-end">
+          {currentTrip && (
+            <button
+              onClick={toggleShareSheet}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-warm-yellow/10 text-warm-yellow hover:bg-warm-yellow/20 transition-colors"
+            >
+              <span className="text-sm">📤</span>
+            </button>
+          )}
+        </div>
       </div>
+      {currentTrip && <WeatherBadge />}
     </header>
   )
 }

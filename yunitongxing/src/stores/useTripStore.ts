@@ -19,6 +19,7 @@ interface TripState {
   loadTripFromHistory: (tripId: string) => void
   deleteTrip: (tripId: string) => void
   clearCurrentTrip: () => void
+  loadFromStorage: () => void
 }
 
 export const useTripStore = create<TripState>((set, get) => ({
@@ -111,4 +112,14 @@ export const useTripStore = create<TripState>((set, get) => ({
   },
 
   clearCurrentTrip: () => set({ currentTrip: null, error: null }),
+
+  loadFromStorage: () => {
+    try {
+      const raw = localStorage.getItem('ytx_trip_history')
+      if (raw) {
+        const trips = JSON.parse(raw) as Trip[]
+        set({ tripHistory: trips })
+      }
+    } catch {}
+  },
 }))

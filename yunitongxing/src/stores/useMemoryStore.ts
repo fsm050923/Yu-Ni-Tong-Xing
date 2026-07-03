@@ -53,7 +53,9 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   addLongTerm: (entry) =>
     set((s) => {
       const next = [...s.longTerm.filter((t) => t.id !== entry.id), entry].slice(-50)
-      return { longTerm: next }
+      const state = { longTerm: next }
+      try { localStorage.setItem('ytx_memory', JSON.stringify({ longTerm: next, preferences: s.preferences, profile: s.profile })) } catch {}
+      return state
     }),
 
   removeLongTerm: (id) =>
@@ -62,20 +64,26 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   setPreference: (entry) =>
     set((s) => {
       const rest = s.preferences.filter((p) => p.key !== entry.key)
-      return { preferences: [...rest, entry] }
+      const prefs = [...rest, entry]
+      try { localStorage.setItem('ytx_memory', JSON.stringify({ longTerm: s.longTerm, preferences: prefs, profile: s.profile })) } catch {}
+      return { preferences: prefs }
     }),
 
   getPreference: (key) => get().preferences.find((p) => p.key === key),
 
   addPreference: (value) =>
-    set((s) => ({
-      preferences: [...s.preferences, { key: value, value, timestamp: Date.now() }],
-    })),
+    set((s) => {
+      const prefs = [...s.preferences, { key: value, value, timestamp: Date.now() }]
+      try { localStorage.setItem('ytx_memory', JSON.stringify({ longTerm: s.longTerm, preferences: prefs, profile: s.profile })) } catch {}
+      return { preferences: prefs }
+    }),
 
   setProfile: (partial) =>
-    set((s) => ({
-      profile: { ...s.profile, ...partial },
-    })),
+    set((s) => {
+      const profile = { ...s.profile, ...partial }
+      try { localStorage.setItem('ytx_memory', JSON.stringify({ longTerm: s.longTerm, preferences: s.preferences, profile })) } catch {}
+      return { profile }
+    }),
 
   loadFromStorage: () => {
     try {
